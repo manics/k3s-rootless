@@ -27,7 +27,7 @@ Environment=PATH=%h/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:
 # NOTE: Don't try to run 'k3s server --rootless' on a terminal, as it doesn't enable cgroup v2 delegation.
 # If you really need to try it on a terminal, prepend 'systemd-run --user -p Delegate=yes --tty' to create a systemd scope.
 ExecStart=%h/bin/k3s server --rootless --snapshotter=fuse-overlayfs --debug -v 3
-ExecReload=/bin/kill -s HUP $MAINPID
+ExecReload=/bin/kill -s HUP \$MAINPID
 TimeoutSec=0
 RestartSec=2
 #Restart=always
@@ -49,8 +49,21 @@ EOF
 systemctl --user daemon-reload
 systemctl --user enable --now k3s-rootless
 
-journalctl --user -u k3s-rootless -fl
-# Ctrl-C when it looks like cluster is running
+# journalctl --user -u k3s-rootless -fl
+
+start=`date +%s`
+# 5 mins
+timeout=300
+while ! ~/bin/kubectl cluster-info > /dev/null 2> /dev/null; do
+  now=`date +%s`
+  t=$(($now-$start))
+  if [ $t -gt $timeout ]; then
+    echo "[$t s] Timeout waiting for k3s to start"
+    exit 1
+  fi
+  echo "[$t s] Waiting for k3s to start ...."
+  sleep 10
+done
 
 ln -s ~/.kube/k3s.yaml ~/.kube/config
 
